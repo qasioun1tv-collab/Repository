@@ -6,36 +6,54 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// 1. تعريف الموديل أولاً (هام جداً)
-const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    isAdmin: { type: Boolean, default: false }
-}));
-
-// 2. رابط الاتصال (تأكد من كتابة الباسورد بدقة)
+// --- كود الاتصال الذكي ---
+// استبدل كلمة AMICCs8GGadWg1jg بالباسورد الذي وضعته في Atlas
 const dbURI = 'mongodb+srv://qasioun1tv_db_user:AMICCs8GGadWg1jg@cluster0.lpyqb59.mongodb.net/qasioun_db?retryWrites=true&w=majority';
 
-// 3. محاولة الاتصال
 mongoose.connect(dbURI)
-    .then(() => console.log("✅ Connected to MongoDB"))
-    .catch(err => console.log("❌ DB Error: ", err.message));
+    .then(async () => {
+        console.log("✅ اتصلنا بنجاح.. القاعدة تعمل الآن أونلاين!");
+        
+        // هنا السيرفر سينشئ حساب المدير (QASUION) تلقائياً أول ما يشتغل
+        const User = mongoose.model('User');
+        const adminExists = await User.findOne({ username: 'QASUION' });
+        if (!adminExists) {
+            await new User({
+                username: 'QASUION',
+                password: 'qasiountv0666',
+                displayName: 'Admin',
+                isAdmin: true
+            }).save();
+            console.log("👤 تم إنشاء حساب المدير بنجاح داخل القاعدة الجديدة");
+        }
+    })
+    .catch(err => console.log("❌ مشكلة في القاعدة: ", err.message));
 
-// 4. رابط تسجيل الدخول
+// --- تعريف الموديل ---
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    displayName: String,
+    isAdmin: { type: Boolean, default: false }
+});
+mongoose.model('User', userSchema);
+
+// --- رابط تسجيل الدخول ---
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
+        const User = mongoose.model('User');
         const user = await User.findOne({ username, password });
         if (user) return res.json(user);
-        res.status(401).json({ message: "Invalid credentials" });
+        res.status(401).json({ message: "خطأ في اليوزر أو الباسورد" });
     } catch (e) {
-        res.status(500).json({ message: e.message });
+        res.status(500).json({ message: "خطأ في السيرفر" });
     }
 });
 
-// إعدادات Vercel
-app.get('/', (req, res) => res.send("Server is Live!"));
+app.get('/', (req, res) => res.send("السيرفر شغال 100%"));
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Running on ${PORT}`));
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
 module.exports = app;
