@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// --- 1. تعريف موديل المستخدم (يجب أن يكون في البداية) ---
+// --- 1. تعريف موديل المستخدم (Schema) ---
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -22,15 +22,16 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// --- 2. الاتصال بقاعدة البيانات وإضافة المدير ---
-// استبدل <db_password> بكلمة المرور الحقيقية التي أنشأتها في Atlas
-const dbURI = 'mongodb+srv://qasioun1tv_db_user:<db_password>@cluster0.lpyqb59.mongodb.net/qasioun_db?retryWrites=true&w=majority';
+// --- 2. الاتصال بقاعدة البيانات (MongoDB Atlas) ---
+// ملاحظة: تأكد من كتابة كلمة المرور بدلاً من <db_password>
+// الرابط المعدل بالباسورد الخاص بك
+const dbURI = 'mongodb+srv://qasioun1tv_db_user:AMICCs8GGadWg1jg@cluster0.lpyqb59.mongodb.net/qasioun_db?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(dbURI)
     .then(async () => {
         console.log("✅ تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح");
         
-        // التحقق من وجود حساب المدير وإضافته إذا لم يكن موجوداً
+        // التحقق من وجود حساب المدير وإضافته تلقائياً
         const adminExists = await User.findOne({ username: 'QASUION' });
         if (!adminExists) {
             const admin = new User({
@@ -51,7 +52,7 @@ mongoose.connect(dbURI)
     })
     .catch(err => console.log("❌ خطأ في الاتصال بالقاعدة:", err));
 
-// --- 3. روابط الـ API ---
+// --- 3. روابط الـ API (Endpoints) ---
 
 app.post('/api/login', async (req, res) => {
     try {
@@ -73,7 +74,7 @@ app.post('/api/users', async (req, res) => {
         await newUser.save();
         res.status(201).json(newUser);
     } catch (e) { 
-        res.status(400).json({ message: "اليوزر موجود بالفعل أو بيانات غير صحيحة" }); 
+        res.status(400).json({ message: "اليوزر موجود بالفعل" }); 
     }
 });
 
@@ -82,7 +83,7 @@ app.get('/api/users', async (req, res) => {
         const users = await User.find();
         res.json(users);
     } catch (e) {
-        res.status(500).json({ message: "فشل جلب المستخدمين" });
+        res.status(500).json({ message: "فشل جلب البيانات" });
     }
 });
 
@@ -109,7 +110,6 @@ app.delete('/api/users/:username', async (req, res) => {
 });
 
 // --- 4. تشغيل السيرفر ---
-// ملاحظة: Render يستخدم PORT متغير، لذا نستخدم process.env.PORT
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 السيرفر يعمل الآن على المنفذ: ${PORT}`);
