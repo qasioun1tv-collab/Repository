@@ -6,12 +6,31 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// 1. الاتصال بقاعدة البيانات
-mongoose.connect('mongodb://127.0.0.1:27017/qasioun_db')
+// --- 1. تعريف موديل المستخدم (يجب أن يكون في البداية) ---
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    displayName: String,
+    phone: String,
+    countryCode: String,
+    isAdmin: { type: Boolean, default: false },
+    subscriptionMonths: Number,
+    trialHours: Number,
+    trialEnd: Number,
+    subscriptionEnd: Number
+});
+
+const User = mongoose.model('User', userSchema);
+
+// --- 2. الاتصال بقاعدة البيانات وإضافة المدير ---
+// استبدل <db_password> بكلمة المرور الحقيقية التي أنشأتها في Atlas
+const dbURI = 'mongodb+srv://qasioun1tv_db_user:<db_password>@cluster0.lpyqb59.mongodb.net/qasioun_db?retryWrites=true&w=majority';
+
+mongoose.connect(dbURI)
     .then(async () => {
-        console.log("✅ تم الاتصال بقاعدة بيانات MongoDB بنجاح");
+        console.log("✅ تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح");
         
-        // 2. التحقق من وجود حساب المدير وإضافته إذا لم يكن موجوداً
+        // التحقق من وجود حساب المدير وإضافته إذا لم يكن موجوداً
         const adminExists = await User.findOne({ username: 'QASUION' });
         if (!adminExists) {
             const admin = new User({
@@ -32,28 +51,20 @@ mongoose.connect('mongodb://127.0.0.1:27017/qasioun_db')
     })
     .catch(err => console.log("❌ خطأ في الاتصال بالقاعدة:", err));
 
-// 3. تعريف موديل المستخدم
-const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    displayName: String,
-    phone: String,
-    countryCode: String,
-    isAdmin: { type: Boolean, default: false },
-    subscriptionMonths: Number,
-    trialHours: Number,
-    trialEnd: Number,
-    subscriptionEnd: Number
-});
+// --- 3. روابط الـ API ---
 
-const User = mongoose.model('User', userSchema);
-
-// 4. روابط الـ API
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
-    const user = await User.findOne({ username, password });
-    if (user) { res.json(user); } 
-    else { res.status(401).json({ message: "خطأ في اليوزر أو الباسورد" }); }
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username, password });
+        if (user) { 
+            res.json(user); 
+        } else { 
+            res.status(401).json({ message: "خطأ في اليوزر أو الباسورد" }); 
+        }
+    } catch (e) {
+        res.status(500).json({ message: "خطأ في السيرفر" });
+    }
 });
 
 app.post('/api/users', async (req, res) => {
@@ -61,24 +72,45 @@ app.post('/api/users', async (req, res) => {
         const newUser = new User(req.body);
         await newUser.save();
         res.status(201).json(newUser);
-    } catch (e) { res.status(400).json({ message: "موجود مسبقاً" }); }
+    } catch (e) { 
+        res.status(400).json({ message: "اليوزر موجود بالفعل أو بيانات غير صحيحة" }); 
+    }
 });
 
 app.get('/api/users', async (req, res) => {
-    const users = await User.find();
-    res.json(users);
+    try {
+        const users = await User.find();
+        res.json(users);
+    } catch (e) {
+        res.status(500).json({ message: "فشل جلب المستخدمين" });
+    }
 });
 
 app.put('/api/users/:username', async (req, res) => {
-    const user = await User.findOneAndUpdate({ username: req.params.username }, req.body, { new: true });
-    res.json(user);
+    try {
+        const user = await User.findOneAndUpdate(
+            { username: req.params.username }, 
+            req.body, 
+            { new: true }
+        );
+        res.json(user);
+    } catch (e) {
+        res.status(400).json({ message: "فشل التحديث" });
+    }
 });
 
 app.delete('/api/users/:username', async (req, res) => {
-    await User.findOneAndDelete({ username: req.params.username });
-    res.json({ message: "تم الحذف" });
+    try {
+        await User.findOneAndDelete({ username: req.params.username });
+        res.json({ message: "تم الحذف بنجاح" });
+    } catch (e) {
+        res.status(400).json({ message: "فشل الحذف" });
+    }
 });
 
-app.listen(3000, () => {
-    console.log(`🚀 السيرفر يعمل على: http://localhost:3000`);
+// --- 4. تشغيل السيرفر ---
+// ملاحظة: Render يستخدم PORT متغير، لذا نستخدم process.env.PORT
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 السيرفر يعمل الآن على المنفذ: ${PORT}`);
 });
