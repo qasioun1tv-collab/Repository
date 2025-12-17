@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// --- 1. تعريف موديل المستخدم (Schema) ---
+// --- 1. تعريف موديل المستخدم ---
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -14,67 +14,57 @@ const userSchema = new mongoose.Schema({
     phone: String,
     countryCode: String,
     isAdmin: { type: Boolean, default: false },
-    subscriptionMonths: Number,
-    trialHours: Number,
-    trialEnd: Number,
-    subscriptionEnd: Number
+    subscriptionMonths: { type: Number, default: 0 },
+    trialHours: { type: Number, default: 0 },
+    trialEnd: { type: Number, default: null },
+    subscriptionEnd: { type: Number, default: null }
 });
 
 const User = mongoose.model('User', userSchema);
 
-// --- 2. الاتصال بقاعدة البيانات (MongoDB Atlas) ---
-// ملاحظة: تأكد من كتابة كلمة المرور بدلاً من <db_password>
-// الرابط المعدل بالباسورد الخاص بك
+// --- 2. إعداد رابط الاتصال ---
+// استبدل كلمة AMICCs8GGadWg1jg بكلمة المرور الحقيقية إذا قمت بتغييرها
 const dbURI = 'mongodb+srv://qasioun1tv_db_user:AMICCs8GGadWg1jg@cluster0.lpyqb59.mongodb.net/qasioun_db?retryWrites=true&w=majority';
 
-mongoose.connect(dbURI)
-    .then(async () => {
-        console.log("✅ تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح");
-        
-        // التحقق من وجود حساب المدير وإضافته تلقائياً
-        const adminExists = await User.findOne({ username: 'QASUION' });
-        if (!adminExists) {
-            const admin = new User({
-                username: 'QASUION',
-                password: 'qasiountv0666',
-                displayName: 'Admin',
-                phone: '+963945245117',
-                countryCode: '+963',
-                isAdmin: true,
-                subscriptionMonths: 0,
-                trialHours: 0,
-                trialEnd: null,
-                subscriptionEnd: null
-            });
-            await admin.save();
-            console.log("👤 تم إنشاء حساب المدير (QASUION) بنجاح");
-        }
-    })
-    .catch(err => console.log("❌ خطأ في الاتصال بالقاعدة:", err));
+// --- 3. الاتصال بالقاعدة مع إضافة إعدادات التوافق ---
+mongoose.connect(dbURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(async () => {
+    console.log("✅ تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح");
+    
+    // إنشاء حساب المدير تلقائياً إذا لم يكن موجوداً
+    const adminExists = await User.findOne({ username: 'QASUION' });
+    if (!adminExists) {
+        await new User({
+            username: 'QASUION',
+            password: 'qasiountv0666',
+            displayName: 'Admin',
+            isAdmin: true
+        }).save();
+        console.log("👤 تم إنشاء حساب المدير بنجاح");
+    }
+})
+.catch(err => {
+    console.error("❌ خطأ في الاتصال بالقاعدة:", err.message);
+});
 
-// --- 3. روابط الـ API (Endpoints) ---
+// --- 4. روابط API ---
+
+app.get('/', (req, res) => res.send('Server is running...'));
 
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username, password });
-        if (user) { 
-            res.json(user); 
-        } else { 
-            res.status(401).json({ message: "خطأ في اليوزر أو الباسورد" }); 
+        if (user) {
+            res.json(user);
+        } else {
+            res.status(401).json({ message: "خطأ في البيانات" });
         }
     } catch (e) {
-        res.status(500).json({ message: "خطأ في السيرفر" });
-    }
-});
-
-app.post('/api/users', async (req, res) => {
-    try {
-        const newUser = new User(req.body);
-        await newUser.save();
-        res.status(201).json(newUser);
-    } catch (e) { 
-        res.status(400).json({ message: "اليوزر موجود بالفعل" }); 
+        res.status(500).json({ message: "خطأ داخلي" });
     }
 });
 
@@ -83,17 +73,23 @@ app.get('/api/users', async (req, res) => {
         const users = await User.find();
         res.json(users);
     } catch (e) {
-        res.status(500).json({ message: "فشل جلب البيانات" });
+        res.status(500).json({ message: "خطأ في جلب البيانات" });
+    }
+});
+
+app.post('/api/users', async (req, res) => {
+    try {
+        const newUser = new User(req.body);
+        await newUser.save();
+        res.status(201).json(newUser);
+    } catch (e) {
+        res.status(400).json({ message: "فشل إضافة المستخدم" });
     }
 });
 
 app.put('/api/users/:username', async (req, res) => {
     try {
-        const user = await User.findOneAndUpdate(
-            { username: req.params.username }, 
-            req.body, 
-            { new: true }
-        );
+        const user = await User.findOneAndUpdate({ username: req.params.username }, req.body, { new: true });
         res.json(user);
     } catch (e) {
         res.status(400).json({ message: "فشل التحديث" });
@@ -103,15 +99,16 @@ app.put('/api/users/:username', async (req, res) => {
 app.delete('/api/users/:username', async (req, res) => {
     try {
         await User.findOneAndDelete({ username: req.params.username });
-        res.json({ message: "تم الحذف بنجاح" });
+        res.json({ message: "تم الحذف" });
     } catch (e) {
         res.status(400).json({ message: "فشل الحذف" });
     }
 });
 
-// --- 4. تشغيل السيرفر ---
+// --- 5. تشغيل السيرفر ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 السيرفر يعمل الآن على المنفذ: ${PORT}`);
+    console.log(`🚀 Server on port ${PORT}`);
 });
 
+module.exports = app; // مهم جداً لعمل Vercel بشكل صحيح
