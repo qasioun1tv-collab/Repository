@@ -25,7 +25,7 @@ const User = mongoose.model('User', userSchema);
 // --- 2. الاتصال بقاعدة البيانات (MongoDB Atlas) ---
 // ملاحظة: تأكد من كتابة كلمة المرور بدلاً من <db_password>
 // الرابط المعدل بالباسورد الخاص بك
-const dbURI = 'mongodb+srv://qasioun1tv_db_user:AMICCs8GGadWg1jg@cluster0.lpyqb59.mongodb.net/qasioun_db?retryWrites=true&w=majority&appName=Cluster0';
+const dbURI = 'mongodb+srv://qasioun1tv_db_user:AMICCs8GGadWg1jg@cluster0.lpyqb59.mongodb.net/qasioun_db?retryWrites=true&w=majority';
 
 mongoose.connect(dbURI)
     .then(async () => {
@@ -114,3 +114,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 السيرفر يعمل الآن على المنفذ: ${PORT}`);
 });
+
